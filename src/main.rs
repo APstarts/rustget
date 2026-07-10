@@ -2,6 +2,7 @@ use anyhow::{Result, bail};
 use clap::Parser;
 use futures_util::StreamExt;
 use reqwest;
+use std::io::{Write, stdout};
 use std::path::Path;
 use tokio::{fs::File, io::AsyncWriteExt};
 use url::Url;
@@ -37,13 +38,10 @@ async fn download(options: DownloadOptions) -> Result<()> {
     }
 
     //checking the file size reported by server
-    match response.content_length() {
-        Some(size) => {
-            println!("File size: {} bytes", size);
-        }
-        None => {
-            println!("Uknown file size");
-        }
+    let content_length: Option<u64> = response.content_length();
+    match content_length {
+        Some(size) => println!("File size: {}", size),
+        None => println!("Uknown file size"),
     }
 
     let file_name = infer_filename(&options.url).expect("couldn't infer file name");
@@ -53,10 +51,18 @@ async fn download(options: DownloadOptions) -> Result<()> {
     // Turn the response body into an async stream
     let mut stream = response.bytes_stream();
 
+    let mut downloaded: u64 = 0;
     // Read one chunk at a time
     while let Some(chunk) = stream.next().await {
         let chunk = chunk?;
         file.write_all(&chunk).await?;
+        downloaded += chunk.len() as u64;
+
+        if let Some(total) = content_length {
+            let percentage = downloaded as f64 / total as f64 * 100.0;
+            println!("\rDownloading {:.2}%", percentage);
+        };
+        stdout().flush()?;
     }
     println!("Download completed");
     Ok(())
