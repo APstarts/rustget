@@ -34,6 +34,7 @@ async fn download(options: DownloadOptions) -> Result<()> {
         bail!("Server returned {}", status);
     }
 
+    //checking the file size reported by server
     match response.content_length() {
         Some(size) => {
             println!("File size: {} byes", size);
