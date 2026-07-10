@@ -2,7 +2,9 @@ use anyhow::{Result, bail};
 use clap::Parser;
 use futures_util::StreamExt;
 use reqwest;
+use std::path::Path;
 use tokio::{fs::File, io::AsyncWriteExt};
+use url::Url;
 
 #[derive(Parser)]
 struct DownloadOptions {
@@ -44,8 +46,9 @@ async fn download(options: DownloadOptions) -> Result<()> {
         }
     }
 
+    let file_name = infer_filename(&options.url).expect("couldn't infer file name");
     //crate file
-    let mut file = File::create("download.bin").await?;
+    let mut file = File::create(file_name).await?;
 
     // Turn the response body into an async stream
     let mut stream = response.bytes_stream();
@@ -57,4 +60,28 @@ async fn download(options: DownloadOptions) -> Result<()> {
     }
     println!("Download completed");
     Ok(())
+}
+
+fn infer_filename(url: &str) -> anyhow::Result<String> {
+    let parsed = Url::parse(url)?; //to parse the url correctly
+    let path = Path::new(parsed.path()); //parsed.path() here gives out something like
+    //files.report.pdf and Path::new() actually
+    //converts it into a file system like path so that
+    //we can use methods like file_name() to get the
+    //file name from the converted path.
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("download.bin"); // since
+    // Path::new()
+    // returns
+    // OsStr
+    // which
+    // needs
+    // to
+    // be
+    // converted
+    // into
+    // str
+    Ok(file_name.to_string())
 }

@@ -861,6 +861,7 @@ dependencies = [
  "futures-util",
  "reqwest",
  "tokio",
+ "url",
 ]
 
 [[package]]
