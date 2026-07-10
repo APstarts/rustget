@@ -39,7 +39,7 @@ async fn download(options: DownloadOptions) -> Result<()> {
     //checking the file size reported by server
     match response.content_length() {
         Some(size) => {
-            println!("File size: {} byes", size);
+            println!("File size: {} bytes", size);
         }
         None => {
             println!("Uknown file size");
