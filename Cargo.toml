@@ -1,0 +1,11 @@
+[package]
+name = "rustget"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.103"
+clap = { version = "4", features = ["derive"] }
+futures-util = "0.3.32"
+reqwest = {version = "0.12", features = ["json", "stream"]}
+tokio = { version = "1", features = ["fs", "macros", "rt-multi-thread"] }
