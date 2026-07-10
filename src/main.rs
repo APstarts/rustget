@@ -13,7 +13,26 @@ use options::DownloadOptions;
 async fn main() -> Result<()> {
     let options = DownloadOptions::parse();
 
-    download(options).await?;
+    let mut handles = Vec::new();
+
+    for url in options.urls {
+        let handle = tokio::spawn(async move {
+            //tokio spawn
+            //creates a
+            //lightweight
+            //async task
+            //just like
+            //thread::spawn
+            //creates an
+            //OS thread
+            download(url).await
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.await??;
+    }
 
     Ok(())
 }

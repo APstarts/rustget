@@ -3,16 +3,16 @@ use futures_util::StreamExt;
 use std::io::{Write, stdout};
 use tokio::{fs::File, io::AsyncWriteExt};
 
-use crate::{options::DownloadOptions, progress::ProgressTracker, utils::infer_filename};
+use crate::{progress::ProgressTracker, utils::infer_filename};
 
-pub async fn download(options: DownloadOptions) -> Result<()> {
-    if options.url.is_empty() {
+pub async fn download(url: String) -> Result<()> {
+    if url.is_empty() {
         bail!("URL cannot be empty");
     }
 
     println!("Connecting...");
 
-    let response = reqwest::get(&options.url).await?;
+    let response = reqwest::get(&url).await?;
 
     let status = response.status();
 
@@ -22,7 +22,7 @@ pub async fn download(options: DownloadOptions) -> Result<()> {
 
     let content_length = response.content_length();
 
-    let filename = infer_filename(&options.url)?;
+    let filename = infer_filename(&url)?;
 
     println!("Saving as: {}", filename);
 
