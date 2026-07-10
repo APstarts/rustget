@@ -1,93 +1,19 @@
-use anyhow::{Result, bail};
-use clap::Parser;
-use futures_util::StreamExt;
-use reqwest;
-use std::io::{Write, stdout};
-use std::path::Path;
-use tokio::{fs::File, io::AsyncWriteExt};
-use url::Url;
+mod downloader;
+mod options;
+mod progress;
+mod utils;
 
-#[derive(Parser)]
-struct DownloadOptions {
-    url: String,
-}
+use anyhow::Result;
+use clap::Parser;
+
+use downloader::download;
+use options::DownloadOptions;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let options = DownloadOptions::parse();
+
     download(options).await?;
+
     Ok(())
-}
-
-async fn download(options: DownloadOptions) -> Result<()> {
-    //Validate input
-    if options.url.is_empty() {
-        bail!("URL cannot be empty");
-    }
-    println!("Downloading: {}", options.url);
-
-    //Send HTTP Response
-    let response = reqwest::get(&options.url).await?;
-    //inspect metadata
-
-    let status = response.status();
-    println!("Status: {}", status);
-
-    if !status.is_success() {
-        bail!("Server returned {}", status);
-    }
-
-    //checking the file size reported by server
-    let content_length: Option<u64> = response.content_length();
-    match content_length {
-        Some(size) => println!("File size: {}", size),
-        None => println!("Uknown file size"),
-    }
-
-    let file_name = infer_filename(&options.url).expect("couldn't infer file name");
-    //crate file
-    let mut file = File::create(file_name).await?;
-
-    // Turn the response body into an async stream
-    let mut stream = response.bytes_stream();
-
-    let mut downloaded: u64 = 0;
-    // Read one chunk at a time
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk?;
-        file.write_all(&chunk).await?;
-        downloaded += chunk.len() as u64;
-
-        if let Some(total) = content_length {
-            let percentage = downloaded as f64 / total as f64 * 100.0;
-            println!("\rDownloading {:.2}%", percentage);
-        };
-        stdout().flush()?;
-    }
-    println!("Download completed");
-    Ok(())
-}
-
-fn infer_filename(url: &str) -> anyhow::Result<String> {
-    let parsed = Url::parse(url)?; //to parse the url correctly
-    let path = Path::new(parsed.path()); //parsed.path() here gives out something like
-    //files.report.pdf and Path::new() actually
-    //converts it into a file system like path so that
-    //we can use methods like file_name() to get the
-    //file name from the converted path.
-    let file_name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("download.bin"); // since
-    // Path::new()
-    // returns
-    // OsStr
-    // which
-    // needs
-    // to
-    // be
-    // converted
-    // into
-    // str
-    Ok(file_name.to_string())
 }
