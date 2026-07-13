@@ -1,6 +1,8 @@
 mod downloader;
+mod metadata;
 mod options;
 mod progress;
+mod segmented;
 mod utils;
 use anyhow::Result;
 use clap::Parser;

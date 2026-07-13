@@ -1,9 +1,8 @@
+use crate::{progress::ProgressTracker, utils::infer_filename};
 use anyhow::{Result, bail};
 use futures_util::StreamExt;
 use std::io::{Write, stdout};
 use tokio::{fs::File, io::AsyncWriteExt};
-
-use crate::{progress::ProgressTracker, utils::infer_filename};
 
 pub async fn download(url: String) -> Result<()> {
     if url.is_empty() {
@@ -22,7 +21,7 @@ pub async fn download(url: String) -> Result<()> {
 
     let content_length = response.content_length();
 
-    let filename = infer_filename(&url)?;
+    let filename = infer_filename(&url).unwrap();
 
     println!("Saving as: {}", filename);
 
