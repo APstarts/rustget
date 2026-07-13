@@ -1,10 +1,11 @@
 use crate::{progress::ProgressTracker, utils::infer_filename};
 use anyhow::{Result, bail};
 use futures_util::StreamExt;
+use reqwest::Client;
 use std::io::{Write, stdout};
 use tokio::{fs::File, io::AsyncWriteExt};
 
-pub async fn download(url: String) -> Result<()> {
+pub async fn download(client: Client, url: String) -> Result<()> {
     if url.is_empty() {
         bail!("URL cannot be empty");
     }

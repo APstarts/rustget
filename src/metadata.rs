@@ -10,6 +10,13 @@ pub struct FileMetaData {
     pub filename: String,
 }
 
+impl FileMetaData {
+    /// if metadata supports segmented downloading then only utilise the segmented downloading
+    pub fn supports_segmented_download(&self) -> bool {
+        self.accept_ranges && self.content_length.is_some()
+    }
+}
+
 pub async fn get_metadata(client: &Client, url: &str) -> Result<FileMetaData> {
     let response = client.head(url).send().await?;
 
