@@ -56,9 +56,6 @@ pub fn calculate_ranges(total_size: u64, connections: u64) -> Vec<(u64, u64)> {
 pub fn prepare_file(filename: &String, total_size: u64) {}
 
 pub async fn segmented_download(client: &Client, metadata: &FileMetaData, url: &str) -> Result<()> {
-    let filename = &metadata.filename;
-    let file = File::create(&filename).await?;
-
     let total_size = metadata
         .content_length
         .expect("Segmented download requires content length");
