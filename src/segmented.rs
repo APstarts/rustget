@@ -23,10 +23,10 @@ async fn download_segment(
     start: u64,
     end: u64,
 ) -> Result<SegmentResult> {
-    let range = format!("bytes={}-{}", start, end);
     let mut file = OpenOptions::new().write(true).open(&output_path).await?; //configuring how
-    //to open the file
     file.seek(std::io::SeekFrom::Start(start)).await?; //open the file at the exact position
+    let range = format!("bytes={}-{}", start, end);
+    //to open the file
     let response = client.get(&url).header(RANGE, range).send().await?; //requesting
     //the
     //range
@@ -51,10 +51,10 @@ async fn download_segment(
         file.write_all(&chunk).await?; //writing to the file.
         bytes_written += chunk.len() as u64;
     }
-    println!(
-        "Downloaded range {}-{} ({} bytes)",
-        start, end, bytes_written
-    );
+    file.flush().await?; //flush() tells the os to push the bytes currently in your application-side
+    //buffer into the operating system's kernel buffer. While this doesn't
+    //guaranttee the data has reached the physical disk(that requires
+    //file.sync_call() it ensures that OS is now responsible for the data.
 
     Ok(SegmentResult {
         start,
