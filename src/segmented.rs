@@ -1,10 +1,14 @@
 use crate::metadata::FileMetaData;
 use anyhow::{Result, bail};
+use futures_util::StreamExt;
 use reqwest::Client;
 use reqwest::header::RANGE;
+use std::path::Path;
+use std::path::PathBuf;
+use tokio::fs::File;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncSeekExt;
-use tokio::{fs::File, io::AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 
 pub struct SegmentResult {
     pub start: u64,
@@ -15,25 +19,47 @@ pub struct SegmentResult {
 async fn download_segment(
     client: Client,
     url: String,
+    output_path: PathBuf,
     start: u64,
     end: u64,
 ) -> Result<SegmentResult> {
     let range = format!("bytes={}-{}", start, end);
-
-    let response = client.get(&url).header(RANGE, range).send().await?;
+    let mut file = OpenOptions::new().write(true).open(&output_path).await?; //configuring how
+    //to open the file
+    file.seek(std::io::SeekFrom::Start(start)).await?; //open the file at the exact position
+    let response = client.get(&url).header(RANGE, range).send().await?; //requesting
+    //the
+    //range
+    //by
+    //sending
+    //header
+    //information
+    //about
+    //required
+    //range
 
     if response.status() != reqwest::StatusCode::PARTIAL_CONTENT {
+        //checking 206 partial content
         bail!("Expected 206 Partial Content, got {}", response.status());
     }
 
-    let bytes = response.bytes().await?;
-
-    println!("Downloaded range {}-{} ({} bytes)", start, end, bytes.len());
+    // streaming instead of capturing the complete range into ram. This keeps the memory usage low.
+    let mut stream = response.bytes_stream();
+    let mut bytes_written: u64 = 0; //keeping log of the bytes actually written
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk?;
+        file.write_all(&chunk).await?; //writing to the file.
+        bytes_written += chunk.len() as u64;
+    }
+    println!(
+        "Downloaded range {}-{} ({} bytes)",
+        start, end, bytes_written
+    );
 
     Ok(SegmentResult {
         start,
         end,
-        bytes_written: bytes.len() as u64,
+        bytes_written: bytes_written,
     })
 }
 
@@ -54,7 +80,16 @@ pub fn calculate_ranges(total_size: u64, connections: u64) -> Vec<(u64, u64)> {
     return ranges;
 }
 
-pub fn prepare_file(filename: &String, total_size: u64) {}
+/// Create the file in advance using this function which can then be used to open independent
+/// handles on it to write data into it concurrently
+pub async fn prepare_file(path: &Path, total_size: u64) -> Result<()> {
+    let file = File::create(path).await?; //create the file using path that is the output path
+    //created inside the segmented_download function
+    //why file is not set to mut? because set_len() modifies the file on disk and not the rust
+    //variable
+    file.set_len(total_size).await?; //setting the size of the file
+    Ok(())
+}
 
 pub async fn segmented_download(client: &Client, metadata: &FileMetaData, url: &str) -> Result<()> {
     let total_size = metadata
@@ -62,6 +97,8 @@ pub async fn segmented_download(client: &Client, metadata: &FileMetaData, url: &
         .expect("Segmented download requires content length");
 
     let connections: u64 = 4;
+    let output_path = PathBuf::from(&metadata.filename);
+    prepare_file(&output_path, total_size).await?;
 
     let chunk_size = total_size / connections;
 
