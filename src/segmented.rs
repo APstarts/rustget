@@ -19,14 +19,11 @@ pub struct SegmentResult {
 async fn download_segment(
     client: Client,
     url: String,
-    output_path: &Path,
+    output_path: PathBuf,
     start: u64,
     end: u64,
 ) -> Result<SegmentResult> {
-    let mut file = OpenOptions::new().write(true).open(&output_path).await?; //configuring how
-    file.seek(std::io::SeekFrom::Start(start)).await?; //open the file at the exact position
     let range = format!("bytes={}-{}", start, end);
-    //to open the file
     let response = client.get(&url).header(RANGE, range).send().await?; //requesting
     //the
     //range
@@ -42,6 +39,8 @@ async fn download_segment(
         //checking 206 partial content
         bail!("Expected 206 Partial Content, got {}", response.status());
     }
+    let mut file = OpenOptions::new().write(true).open(&output_path).await?; //configuring how
+    file.seek(std::io::SeekFrom::Start(start)).await?; //open the file at the exact position
 
     // streaming instead of capturing the complete range into ram. This keeps the memory usage low.
     let mut stream = response.bytes_stream();
@@ -51,10 +50,13 @@ async fn download_segment(
         file.write_all(&chunk).await?; //writing to the file.
         bytes_written += chunk.len() as u64;
     }
-    file.flush().await?; //flush() tells the os to push the bytes currently in your application-side
+    // file.flush().await?; //flush() tells the os to push the bytes currently in your application-side
     //buffer into the operating system's kernel buffer. While this doesn't
     //guaranttee the data has reached the physical disk(that requires
     //file.sync_call() it ensures that OS is now responsible for the data.
+    // Here we don't need file.flush() as when the file goes out of scope rust closes the file and
+    // closing the file causes the OS to flush the buffered data. removing this flush code will
+    // cause one less system call.
 
     Ok(SegmentResult {
         start,
@@ -100,41 +102,36 @@ pub async fn segmented_download(client: &Client, metadata: &FileMetaData, url: &
     let output_path = PathBuf::from(&metadata.filename);
     prepare_file(&output_path, total_size).await?;
 
-    let chunk_size = total_size / connections;
-
     let mut handles = Vec::new(); //number of concurrent
     //tasks
-
-    for i in 0..connections {
-        let start = i * chunk_size;
-        let end = if i == connections - 1 {
-            total_size - 1
-        } else {
-            start + chunk_size - 1
-        };
-
+    let ranges = calculate_ranges(total_size, connections);
+    for (start, end) in ranges {
         let client = client.clone();
         let url = url.to_owned();
+        let output_path = output_path.clone();
 
-        let handle = tokio::spawn(async move { download_segment(client, url, start, end).await });
+        let handle =
+            tokio::spawn(
+                async move { download_segment(client, url, output_path, start, end).await },
+            );
+
         handles.push(handle);
     }
 
     let mut results = Vec::new();
 
     for handle in handles {
-        let result = handle.await??;
-        results.push(result);
+        results.push(handle.await??);
     }
 
-    println!("Download Segments:");
-
-    for result in results {
+    for result in &results {
         println!(
             "{}-{} -> {} bytes",
             result.start, result.end, result.bytes_written
         );
     }
+
+    println!("Download Segments:");
 
     Ok(())
 }
