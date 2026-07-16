@@ -19,7 +19,7 @@ pub struct SegmentResult {
 async fn download_segment(
     client: Client,
     url: String,
-    output_path: PathBuf,
+    output_path: &Path,
     start: u64,
     end: u64,
 ) -> Result<SegmentResult> {
