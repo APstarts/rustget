@@ -1,18 +1,50 @@
-use crate::{progress::ProgressTracker, utils::infer_filename};
+use crate::metadata::{FileMetaData, get_metadata};
+use crate::progress::ProgressTracker;
+use crate::segmented::segmented_download;
 use anyhow::{Result, bail};
 use futures_util::StreamExt;
 use reqwest::Client;
 use std::io::{Write, stdout};
 use tokio::{fs::File, io::AsyncWriteExt};
 
+enum DownloadStrategy {
+    Normal,
+    Segmented,
+}
+
+fn download_strategy(metadata: &FileMetaData) -> DownloadStrategy {
+    if metadata.supports_segmented_download() {
+        DownloadStrategy::Segmented
+    } else {
+        DownloadStrategy::Normal
+    }
+}
 pub async fn download(client: Client, url: String) -> Result<()> {
     if url.is_empty() {
         bail!("URL cannot be empty");
     }
 
-    println!("Connecting...");
+    let metadata = get_metadata(&client, &url).await?;
 
-    let response = reqwest::get(&url).await?;
+    println!("Downloading filename: {}", metadata.filename);
+
+    match download_strategy(&metadata) {
+        DownloadStrategy::Segmented => {
+            println!("Using segmented download");
+
+            segmented_download(&client, &metadata, &url).await?;
+        }
+        DownloadStrategy::Normal => {
+            normal_download(&client, &metadata, &url).await?;
+        }
+    }
+
+    println!("Connecting...");
+    Ok(())
+}
+
+async fn normal_download(client: &Client, metadata: &FileMetaData, url: &str) -> Result<()> {
+    let response = client.get(url).send().await?;
 
     let status = response.status();
 
@@ -22,7 +54,7 @@ pub async fn download(client: Client, url: String) -> Result<()> {
 
     let content_length = response.content_length();
 
-    let filename = infer_filename(&url).unwrap();
+    let filename = &metadata.filename;
 
     println!("Saving as: {}", filename);
 

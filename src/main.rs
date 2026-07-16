@@ -42,7 +42,7 @@ async fn main() -> Result<()> {
             //before download(url) Why? Because waiting
             //for  a permit is asynchronous. The task
             //can happily exist while waiting.
-            download(client.clone(), url).await
+            download(client, url).await
         });
         handles.push(handle);
     }

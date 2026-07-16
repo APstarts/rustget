@@ -67,6 +67,8 @@ async fn download_segment(
 
 /// Takes in the total size and number of connections to calculate the ranges to download
 pub fn calculate_ranges(total_size: u64, connections: u64) -> Vec<(u64, u64)> {
+    println!("Total size: {total_size}");
+    println!("connections: {connections}");
     let range_size = total_size / connections;
     let mut ranges: Vec<(u64, u64)> = Vec::new();
     for i in 0..connections {

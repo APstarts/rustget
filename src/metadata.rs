@@ -1,6 +1,6 @@
 use anyhow::{Result, bail};
 use reqwest::Client;
-use reqwest::header::ACCEPT_RANGES;
+use reqwest::header::{ACCEPT_RANGES, CONTENT_LENGTH};
 
 use crate::utils::resolve_filename;
 
@@ -23,7 +23,12 @@ pub async fn get_metadata(client: &Client, url: &str) -> Result<FileMetaData> {
     if !response.status().is_success() {
         bail!("Server returned {}", response.status());
     }
-    let content_length = response.content_length();
+    let content_length = response
+        .headers()
+        .get(CONTENT_LENGTH)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.parse::<u64>().ok());
+    println!("Content Length: {}", content_length.unwrap());
     let headers = response.headers();
     let accept_ranges = headers
         .get(ACCEPT_RANGES)
