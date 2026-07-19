@@ -24,10 +24,9 @@ async fn download_segment(
     client: Client,
     url: String,
     output_path: PathBuf,
-    start: u64,
-    end: u64,
+    segment: Segment,
 ) -> Result<SegmentResult> {
-    let range = format!("bytes={}-{}", start, end);
+    let range = format!("bytes={}-{}", segment.start, segment.end);
     let response = client.get(&url).header(RANGE, range).send().await?; //requesting
     //the
     //range
@@ -44,7 +43,7 @@ async fn download_segment(
         bail!("Expected 206 Partial Content, got {}", response.status());
     }
     let mut file = OpenOptions::new().write(true).open(&output_path).await?; //configuring how
-    file.seek(std::io::SeekFrom::Start(start)).await?; //open the file at the exact position
+    file.seek(std::io::SeekFrom::Start(segment.start)).await?; //open the file at the exact position
 
     // streaming instead of capturing the complete range into ram. This keeps the memory usage low.
     let mut stream = response.bytes_stream();
@@ -63,7 +62,7 @@ async fn download_segment(
     // cause one less system call.
 
     Ok(SegmentResult {
-        segment: Segment { start, end },
+        segment: segment,
         bytes_written: bytes_written,
     })
 }
@@ -114,9 +113,8 @@ pub async fn segmented_download(client: &Client, metadata: &FileMetaData, url: &
         let url = url.to_owned();
         let output_path = output_path.clone();
 
-        let handle = tokio::spawn(async move {
-            download_segment(client, url, output_path, segment.start, segment.end).await
-        });
+        let handle =
+            tokio::spawn(async move { download_segment(client, url, output_path, segment).await });
 
         handles.push(handle);
     }
