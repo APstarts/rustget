@@ -10,9 +10,13 @@ use tokio::fs::OpenOptions;
 use tokio::io::AsyncSeekExt;
 use tokio::io::AsyncWriteExt;
 
+pub struct Segment {
+    start: u64,
+    end: u64,
+}
+
 pub struct SegmentResult {
-    pub start: u64,
-    pub end: u64,
+    pub segment: Segment,
     pub bytes_written: u64,
 }
 
@@ -59,18 +63,17 @@ async fn download_segment(
     // cause one less system call.
 
     Ok(SegmentResult {
-        start,
-        end,
+        segment: Segment { start, end },
         bytes_written: bytes_written,
     })
 }
 
 /// Takes in the total size and number of connections to calculate the ranges to download
-pub fn calculate_ranges(total_size: u64, connections: u64) -> Vec<(u64, u64)> {
+pub fn calculate_ranges(total_size: u64, connections: u64) -> Vec<Segment> {
     println!("Total size: {total_size}");
     println!("connections: {connections}");
     let range_size = total_size / connections;
-    let mut ranges: Vec<(u64, u64)> = Vec::new();
+    let mut ranges: Vec<Segment> = Vec::new();
     for i in 0..connections {
         let start = i * range_size;
         let end = if i == 3 {
@@ -78,8 +81,7 @@ pub fn calculate_ranges(total_size: u64, connections: u64) -> Vec<(u64, u64)> {
         } else {
             (i + 1) * range_size - 1
         };
-        let range = (start, end);
-        ranges.push(range);
+        ranges.push(Segment { start, end });
     }
     return ranges;
 }
@@ -107,15 +109,14 @@ pub async fn segmented_download(client: &Client, metadata: &FileMetaData, url: &
     let mut handles = Vec::new(); //number of concurrent
     //tasks
     let ranges = calculate_ranges(total_size, connections);
-    for (start, end) in ranges {
+    for segment in ranges {
         let client = client.clone();
         let url = url.to_owned();
         let output_path = output_path.clone();
 
-        let handle =
-            tokio::spawn(
-                async move { download_segment(client, url, output_path, start, end).await },
-            );
+        let handle = tokio::spawn(async move {
+            download_segment(client, url, output_path, segment.start, segment.end).await
+        });
 
         handles.push(handle);
     }
@@ -129,7 +130,7 @@ pub async fn segmented_download(client: &Client, metadata: &FileMetaData, url: &
     for result in &results {
         println!(
             "{}-{} -> {} bytes",
-            result.start, result.end, result.bytes_written
+            result.segment.start, result.segment.end, result.bytes_written
         );
     }
 
