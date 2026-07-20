@@ -20,6 +20,9 @@ impl Segment {
     pub fn len(&self) -> u64 {
         self.end - self.start + 1
     }
+    pub fn range_header(&self) -> String {
+        format!("bytes={}-{}", self.start, self.end)
+    }
 }
 
 pub struct SegmentResult {
@@ -33,7 +36,7 @@ async fn download_segment(
     output_path: PathBuf,
     segment: Segment,
 ) -> Result<SegmentResult> {
-    let range = format!("bytes={}-{}", segment.start, segment.end);
+    let range = segment.range_header();
     let response = client.get(&url).header(RANGE, range).send().await?; //requesting
     //the
     //range
