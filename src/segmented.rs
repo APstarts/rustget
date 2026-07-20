@@ -12,8 +12,14 @@ use tokio::io::AsyncWriteExt;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Segment {
-    start: u64,
-    end: u64,
+    pub start: u64,
+    pub end: u64,
+}
+
+impl Segment {
+    pub fn len(&self) -> u64 {
+        self.end - self.start + 1
+    }
 }
 
 pub struct SegmentResult {
@@ -108,8 +114,8 @@ pub async fn segmented_download(client: &Client, metadata: &FileMetaData, url: &
 
     let mut handles = Vec::new(); //number of concurrent
     //tasks
-    let ranges = calculate_ranges(total_size, connections);
-    for segment in ranges {
+    let segments = calculate_ranges(total_size, connections);
+    for segment in segments {
         let client = client.clone();
         let url = url.to_owned();
         let output_path = output_path.clone();
