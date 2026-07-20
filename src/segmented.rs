@@ -76,7 +76,7 @@ pub fn calculate_ranges(total_size: u64, connections: u64) -> Vec<Segment> {
     let mut ranges: Vec<Segment> = Vec::new();
     for i in 0..connections {
         let start = i * range_size;
-        let end = if i == 3 {
+        let end = if i == connections - 1 {
             total_size - 1
         } else {
             (i + 1) * range_size - 1
