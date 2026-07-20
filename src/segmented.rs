@@ -10,6 +10,7 @@ use tokio::fs::OpenOptions;
 use tokio::io::AsyncSeekExt;
 use tokio::io::AsyncWriteExt;
 
+#[derive(Debug, Clone, Copy)]
 pub struct Segment {
     start: u64,
     end: u64,
