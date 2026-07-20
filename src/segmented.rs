@@ -10,6 +10,8 @@ use tokio::fs::OpenOptions;
 use tokio::io::AsyncSeekExt;
 use tokio::io::AsyncWriteExt;
 
+// without copy the ownership moves if we had a = Segment and then b = a
+// Without clone the method clone() wouldn't have been available
 #[derive(Debug, Clone, Copy)]
 pub struct Segment {
     pub start: u64,
